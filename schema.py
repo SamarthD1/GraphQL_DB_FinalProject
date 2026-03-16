@@ -83,6 +83,87 @@ class Query(graphene.ObjectType):
         results = db.execute_query(query, {"skill_name": f"(?i){skill_name}", "min_level": min_level})
         return [StudentType(**res['s']) for res in results]
 
+class CreateProjectInput(graphene.InputObjectType):
+    id = graphene.ID(required=True)
+    title = graphene.String(required=True)
+    description = graphene.String(required=True)
+    maxMembers = graphene.Int(required=True)
+
+class CreateProject(graphene.Mutation):
+    class Arguments:
+        input = CreateProjectInput(required=True)
+
+    project = graphene.Field(ProjectType)
+
+    def mutate(self, info, input):
+        db = get_db()
+        # Check if project already exists
+        check = db.execute_query("MATCH (p:Project {id: $id}) RETURN p", {"id": input['id']})
+        if check:
+            raise Exception("Project with this ID already exists")
+
+        query = """
+        CREATE (p:Project {id: $id, title: $title, description: $description, max_members: $maxMembers})
+        RETURN p
+        """
+        result = db.execute_query(query, input)
+        return CreateProject(project=ProjectType(**result[0]['p']))
+
+class CreateStudentInput(graphene.InputObjectType):
+    id = graphene.ID(required=True)
+    name = graphene.String(required=True)
+    email = graphene.String(required=True)
+
+class CreateStudent(graphene.Mutation):
+    class Arguments:
+        input = CreateStudentInput(required=True)
+
+    student = graphene.Field(StudentType)
+
+    def mutate(self, info, input):
+        db = get_db()
+        # Check if student already exists
+        check = db.execute_query("MATCH (s:Student {id: $id}) RETURN s", {"id": input['id']})
+        if check:
+            raise Exception("Student with this ID already exists")
+
+        query = """
+        CREATE (s:Student {id: $id, name: $name, email: $email})
+        RETURN s
+        """
+        result = db.execute_query(query, input)
+        return CreateStudent(student=StudentType(**result[0]['s']))
+
+class AddSkillToStudentInput(graphene.InputObjectType):
+    studentId = graphene.ID(required=True)
+    skillName = graphene.String(required=True)
+    level = graphene.Int(required=True)
+
+class AddSkillToStudent(graphene.Mutation):
+    class Arguments:
+        input = AddSkillToStudentInput(required=True)
+
+    success = graphene.Boolean()
+
+    def mutate(self, info, input):
+        db = get_db()
+        # Check student exists
+        check = db.execute_query("MATCH (s:Student {id: $studentId}) RETURN s", {"studentId": input['studentId']})
+        if not check:
+            raise Exception("Student not found")
+
+        # Create or find the skill and link it
+        query = """
+        MATCH (s:Student {id: $studentId})
+        MERGE (sk:Skill {name: $skillName})
+        ON CREATE SET sk.id = $skillId, sk.level = $level
+        MERGE (s)-[:HAS_SKILL]->(sk)
+        RETURN true as success
+        """
+        skill_id = f"s_{input['skillName'].lower()}"
+        db.execute_query(query, {**input, "skillId": skill_id})
+        return AddSkillToStudent(success=True)
+
 class ApplyProjectInput(graphene.InputObjectType):
     projectId = graphene.ID(required=True)
     studentId = graphene.ID(required=True)
@@ -167,6 +248,9 @@ class ApproveApplication(graphene.Mutation):
         return ApproveApplication(success=True)
 
 class Mutation(graphene.ObjectType):
+    createProject = CreateProject.Field()
+    createStudent = CreateStudent.Field()
+    addSkillToStudent = AddSkillToStudent.Field()
     applyProject = ApplyProject.Field()
     approveApplication = ApproveApplication.Field()
 

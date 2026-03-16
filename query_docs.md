@@ -130,7 +130,106 @@ RETURN s
 
 ---
 
-### 5. Apply for a Project
+### 5. Create a New Project
+
+**GraphQL**:
+```graphql
+mutation {
+  createProject(input: {
+    id: "p3",
+    title: "Mobile App",
+    description: "Building a cross-platform mobile app",
+    maxMembers: 4
+  }) {
+    project {
+      id
+      title
+      maxMembers
+    }
+  }
+}
+```
+
+**Neo4j Cypher** (2 queries run in sequence):
+```cypher
+-- Step 1: Check if project already exists
+MATCH (p:Project {id: "p3"}) RETURN p
+
+-- Step 2: Create the project node
+CREATE (p:Project {id: "p3", title: "Mobile App", description: "Building a cross-platform mobile app", max_members: 4})
+RETURN p
+```
+
+**What it does**: First checks if a project with that ID already exists (prevents duplicates), then creates a new `Project` node in the graph with the given properties.
+
+---
+
+### 6. Create a New Student
+
+**GraphQL**:
+```graphql
+mutation {
+  createStudent(input: {
+    id: "5",
+    name: "Samarth",
+    email: "samarth@gmail.com"
+  }) {
+    student {
+      id
+      name
+      email
+    }
+  }
+}
+```
+
+**Neo4j Cypher** (2 queries run in sequence):
+```cypher
+-- Step 1: Check if student already exists
+MATCH (s:Student {id: "5"}) RETURN s
+
+-- Step 2: Create the student node
+CREATE (s:Student {id: "5", name: "Samarth", email: "samarth@gmail.com"})
+RETURN s
+```
+
+**What it does**: Validates that no student with the same ID exists, then creates a new `Student` node in the graph.
+
+---
+
+### 7. Add a Skill to a Student
+
+**GraphQL**:
+```graphql
+mutation {
+  addSkillToStudent(input: {
+    studentId: "5",
+    skillName: "Flutter",
+    level: 5
+  }) {
+    success
+  }
+}
+```
+
+**Neo4j Cypher** (2 queries run in sequence):
+```cypher
+-- Step 1: Check student exists
+MATCH (s:Student {id: "5"}) RETURN s
+
+-- Step 2: Create/find the skill and link it to the student
+MATCH (s:Student {id: "5"})
+MERGE (sk:Skill {name: "Flutter"})
+ON CREATE SET sk.id = "s_flutter", sk.level = 5
+MERGE (s)-[:HAS_SKILL]->(sk)
+RETURN true as success
+```
+
+**What it does**: Verifies the student exists, then uses `MERGE` to either find or create the `Skill` node and creates a `HAS_SKILL` relationship between the student and the skill. `MERGE` prevents duplicate skill nodes.
+
+---
+
+### 8. Apply for a Project
 
 **GraphQL**:
 ```graphql
@@ -167,7 +266,7 @@ RETURN r.id as id
 
 ---
 
-### 6. Approve an Application
+### 9. Approve an Application
 
 **GraphQL**:
 ```graphql
@@ -208,13 +307,16 @@ Run these in order to test every feature:
 
 | Step | Action | What it Tests |
 | :--- | :--- | :--- |
-| 1 | Run **Query #3** (students) | View all students and skills |
-| 2 | Run **Query #4** (studentsBySkill: "Python") | **Skill-based matching** |
-| 3 | Run **Mutation #5** (apply student 2 to p1) | **Application creation** |
-| 4 | Run **Mutation #5** again (same inputs) | **Duplicate prevention** (should error) |
-| 5 | Run **Mutation #6** (approve app_2_p1) | **Application approval + Role assignment** |
-| 6 | Run **Query #2** (projects with teamMembers) | **Team listing** |
-| 7 | Keep approving until project is full | **Member limit check** (should error) |
+| 1 | Run **Mutation #5** (createProject) | **Project creation** |
+| 2 | Run **Mutation #6** (createStudent) | **Student creation** |
+| 3 | Run **Mutation #7** (addSkillToStudent) | **Skill assignment** |
+| 4 | Run **Query #3** (students) | View all students and skills |
+| 5 | Run **Query #4** (studentsBySkill: "Python") | **Skill-based matching** |
+| 6 | Run **Mutation #8** (apply student 2 to p1) | **Application creation** |
+| 7 | Run **Mutation #8** again (same inputs) | **Duplicate prevention** (should error) |
+| 8 | Run **Mutation #9** (approve app_2_p1) | **Application approval + Role assignment** |
+| 9 | Run **Query #2** (projects with teamMembers) | **Team listing** |
+| 10 | Keep approving until project is full | **Member limit check** (should error) |
 
 ---
 
@@ -225,3 +327,5 @@ Run these in order to test every feature:
 | `HAS_SKILL` | Student | Skill | — | Student possesses this skill |
 | `APPLIED_TO` | Student | Project | id, status, role | Pending application |
 | `MEMBER_OF` | Student | Project | role | Approved team member |
+
+
